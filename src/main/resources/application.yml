@@ -1,0 +1,22 @@
+spring:
+  application:
+    name: vaccine-management
+
+  datasource:
+    url: ${SPRING_DATASOURCE_URL:jdbc:mysql://localhost:3306/hospital_management?allowPublicKeyRetrieval=true&useSSL=false}
+    username: ${SPRING_DATASOURCE_USERNAME:root}
+    password: ${SPRING_DATASOURCE_PASSWORD:root}
+    driver-class-name: com.mysql.cj.jdbc.Driver
+
+  jpa:
+    hibernate:
+      ddl-auto: update
+      naming:
+        physical-strategy: org.hibernate.boot.model.naming.PhysicalNamingStrategyStandardImpl
+    show-sql: true
+    open-in-view: false
+    properties:
+      hibernate:
+        format_sql: true
+jwt:
+  signerKey: "0b9f3768ad8da2bc950167c591c0cde6c1ac85506956c2771f6269d8a901c7ea"
