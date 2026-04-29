@@ -2,12 +2,15 @@ package com.finalproject.vaccine_management.service.Impl;
 
 import com.finalproject.vaccine_management.dto.request.auth.AuthenticationRequest;
 import com.finalproject.vaccine_management.dto.request.auth.IntrospectRequest;
+import com.finalproject.vaccine_management.dto.request.auth.LogoutRequest;
 import com.finalproject.vaccine_management.dto.response.AuthenticationResponse;
 import com.finalproject.vaccine_management.dto.response.IntrospectResponse;
+import com.finalproject.vaccine_management.entity.InvalidatedToken;
 import com.finalproject.vaccine_management.entity.User;
 import com.finalproject.vaccine_management.exception.AppException;
 import com.finalproject.vaccine_management.exception.ErrorCode;
 import com.finalproject.vaccine_management.repository.IUserRepository;
+import com.finalproject.vaccine_management.repository.InvalidateTokenRepository;
 import com.finalproject.vaccine_management.service.IAuthenticationService;
 import com.nimbusds.jose.*;
 import com.nimbusds.jose.crypto.MACSigner;
@@ -29,6 +32,7 @@ import java.time.Instant;
 import java.time.temporal.ChronoUnit;
 import java.util.Date;
 import java.util.StringJoiner;
+import java.util.UUID;
 
 @Service
 @Slf4j
@@ -39,6 +43,8 @@ public class AuthenticationService implements IAuthenticationService {
     IUserRepository userRepository;
 
     PasswordEncoder passwordEncoder;
+
+    InvalidateTokenRepository invalidateTokenRepository;
 
     @Value("${jwt.signerKey}")
     @NonFinal
@@ -79,6 +85,7 @@ public class AuthenticationService implements IAuthenticationService {
                 .expirationTime(new Date(
                         Instant.now().plus(1, ChronoUnit.HOURS).toEpochMilli()
                 ))
+                .jwtID(UUID.randomUUID().toString())
                 .claim("scope", buildScope(user))
                 .build();
 
@@ -112,7 +119,36 @@ public class AuthenticationService implements IAuthenticationService {
     public IntrospectResponse introspect (IntrospectRequest request)
             throws JOSEException, ParseException {
         String token = request.getToken();
+        boolean isValid = true;
 
+        try {
+            verifyToken(token);
+        } catch (AppException e) {
+            isValid = false;
+        }
+
+        return IntrospectResponse.builder()
+                .valid(isValid)
+                .build();
+    }
+
+    @Override
+    public void logout(LogoutRequest logoutRequest) throws ParseException, JOSEException {
+        var signToken = verifyToken(logoutRequest.getToken());
+
+        String jit = signToken.getJWTClaimsSet().getJWTID();
+        Date expiryTime = signToken.getJWTClaimsSet().getExpirationTime();
+
+        InvalidatedToken invalidatedToken = InvalidatedToken.builder()
+                .id(jit)
+                .expiryTime(expiryTime)
+                .build();
+
+        invalidateTokenRepository.save(invalidatedToken);
+
+    }
+
+    private SignedJWT verifyToken(String token) throws JOSEException, ParseException {
         //verifier
         JWSVerifier verifier = new MACVerifier(SIGNER_KEY.getBytes());
 
@@ -123,11 +159,15 @@ public class AuthenticationService implements IAuthenticationService {
 
         var verified = signedJWT.verify(verifier);
 
-        boolean isNotExpired = expiryTime.after(new Date());
+        if( (!verified) && expiryTime.after(new Date()))
+            throw new AppException(ErrorCode.UNAUTHENTICATED);
+        String tokenId = signedJWT.getJWTClaimsSet().getJWTID();
 
-        return IntrospectResponse.builder()
-                .valid(verified && isNotExpired)
-                .build();
-
+        if(invalidateTokenRepository.existsById(tokenId)){
+            throw new AppException(ErrorCode.UNAUTHENTICATED);
+        }
+        return signedJWT;
     }
+
+
 }

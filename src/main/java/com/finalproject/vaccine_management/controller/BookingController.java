@@ -7,6 +7,7 @@ import com.finalproject.vaccine_management.dto.response.ApiResponse;
 import com.finalproject.vaccine_management.dto.response.BookingResponse;
 import com.finalproject.vaccine_management.dto.response.VaccineResponse;
 import com.finalproject.vaccine_management.service.IBookingService;
+import jakarta.validation.Valid;
 import lombok.AccessLevel;
 import lombok.RequiredArgsConstructor;
 import lombok.experimental.FieldDefaults;
@@ -42,7 +43,7 @@ public class BookingController {
     @PutMapping("/{id}")
     ApiResponse<BookingResponse> updateStatus(
             @PathVariable String id,
-            @RequestBody BookingUpdateRequest request
+             @Valid @RequestBody BookingUpdateRequest request
     ){
         return ApiResponse.<BookingResponse>builder()
                 .result(bookingService.updateStatus(id,request))

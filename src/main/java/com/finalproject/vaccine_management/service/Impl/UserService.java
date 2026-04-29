@@ -5,6 +5,7 @@ import com.finalproject.vaccine_management.dto.request.user.UserFilterRequest;
 import com.finalproject.vaccine_management.dto.request.user.UserUpdateRequest;
 import com.finalproject.vaccine_management.dto.response.ApiResponse;
 import com.finalproject.vaccine_management.dto.response.UserResponse;
+import com.finalproject.vaccine_management.entity.RoleName;
 import com.finalproject.vaccine_management.entity.User;
 import com.finalproject.vaccine_management.exception.AppException;
 import com.finalproject.vaccine_management.exception.ErrorCode;
@@ -20,13 +21,17 @@ import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageImpl;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.domain.Specification;
+import org.springframework.security.core.Authentication;
+import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.util.ArrayList;
+import java.util.HashSet;
 import java.util.List;
+import java.util.Set;
 
 @Service
 @RequiredArgsConstructor
@@ -47,6 +52,18 @@ public class UserService implements IUserService {
         User user = userMapper.fromUserCreate(request);
         user.setPassword(encoder.encode(request.getPassword()));
         user.setIsDeleted(false);
+
+        Authentication auth = SecurityContextHolder.getContext()
+                .getAuthentication();
+
+        boolean isAdmin = auth.getAuthorities().stream()
+                .anyMatch( r -> r.getAuthority().equals("ROLE_ADMIN"));
+
+        Set<String> roles = (isAdmin && request.getRoles() != null && !request.getRoles().isEmpty() )
+                ? request.getRoles()
+                : Set.of(RoleName.USER.name());
+
+        user.setRoles(roles);
 
         return ApiResponse.<User>builder()
                 .code(1000)

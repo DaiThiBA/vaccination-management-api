@@ -3,6 +3,7 @@ package com.finalproject.vaccine_management.service.Impl;
 import com.finalproject.vaccine_management.dto.request.booking.BookingCreationRequest;
 import com.finalproject.vaccine_management.dto.request.booking.BookingFilterRequest;
 import com.finalproject.vaccine_management.dto.request.booking.BookingUpdateRequest;
+import com.finalproject.vaccine_management.dto.request.medicalRecord.MedicalRecordCreationRequest;
 import com.finalproject.vaccine_management.dto.response.BookingResponse;
 import com.finalproject.vaccine_management.entity.Booking;
 import com.finalproject.vaccine_management.entity.BookingStatus;
@@ -10,9 +11,11 @@ import com.finalproject.vaccine_management.exception.AppException;
 import com.finalproject.vaccine_management.exception.ErrorCode;
 import com.finalproject.vaccine_management.mapper.BookingMapper;
 import com.finalproject.vaccine_management.repository.IBookingRepository;
+import com.finalproject.vaccine_management.repository.IMedicalRepository;
 import com.finalproject.vaccine_management.repository.IScheduleRepository;
 import com.finalproject.vaccine_management.repository.IUserRepository;
 import com.finalproject.vaccine_management.service.IBookingService;
+import com.finalproject.vaccine_management.service.IMedicalRecordService;
 import jakarta.persistence.criteria.Join;
 import jakarta.persistence.criteria.JoinType;
 import lombok.AccessLevel;
@@ -38,6 +41,9 @@ public class BookingService implements IBookingService {
 
     IUserRepository userRepository;
     IScheduleRepository scheduleRepository;
+
+    IMedicalRecordService medicalRecordService;
+    IMedicalRepository medicalRepository;
 
     @Override
     @Transactional
@@ -83,11 +89,22 @@ public class BookingService implements IBookingService {
         BookingStatus current = booking.getStatus();
         BookingStatus next = request.getStatus();
 
-        if (current == BookingStatus.CANCELLED || current == BookingStatus.COMPLETED) {
+
+        if (current == BookingStatus.CANCELLED || current == BookingStatus.COMPLETED || current == next) {
             throw new AppException(ErrorCode.INVALID_STATUS_TRANSITION);
         }
 
+        if(next == BookingStatus.COMPLETED ) {
+            if (request.getMedicalRecordCreationRequest() != null) {
+                MedicalRecordCreationRequest medicalRecordCreationRequest = request.getMedicalRecordCreationRequest();
+                medicalRecordService.create(medicalRecordCreationRequest);
+            }
+            else {
+                throw new AppException(ErrorCode.MEDICAL_RECORD_NOT_FOUND);
+            }
+        }
         booking.setStatus(next);
+
 
         return bookingMapper.toBookingResponse(bookingRepository.save(booking));
     }

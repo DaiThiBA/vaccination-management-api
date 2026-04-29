@@ -1,8 +1,7 @@
 package com.finalproject.vaccine_management.entity;
 
 import jakarta.persistence.*;
-import lombok.Getter;
-import lombok.Setter;
+import lombok.*;
 
 import java.time.LocalDateTime;
 
@@ -10,19 +9,18 @@ import java.time.LocalDateTime;
 @Table(name = "medical_record")
 @Getter
 @Setter
+@Builder
+@NoArgsConstructor
+@AllArgsConstructor
 public class MedicalRecord {
 
     @Id
     @GeneratedValue(strategy = GenerationType.UUID)
     private String id;
 
-    @ManyToOne
-    @JoinColumn(name = "user_id")
-    private User patient;
-
-    @ManyToOne
-    @JoinColumn(name = "vaccine_id")
-    private Vaccine vaccine;
+    @OneToOne
+    @JoinColumn(name = "booking_id", unique = true)
+    private Booking booking;
 
     @ManyToOne
     @JoinColumn(name = "batch_id")
@@ -32,7 +30,9 @@ public class MedicalRecord {
     @JoinColumn(name = "staff_id")
     private User staff;
 
+    @Column(name = "injection_date")
     private LocalDateTime injectionDate;
 
+    @Column(name = "reaction")
     private String reaction;
 }

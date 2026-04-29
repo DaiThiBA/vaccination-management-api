@@ -24,7 +24,7 @@ public enum ErrorCode {
     BATCH_NOT_FOUND(1030, "Batch not found",HttpStatus.NOT_FOUND ),
     SCHEDULE_NOT_FOUND(1040,"Schedule not found" , HttpStatus.NOT_FOUND),
     SLOT_FULL(1041,"Slot full" ,HttpStatus.BAD_REQUEST),
-        ;
+    MEDICAL_RECORD_NOT_FOUND(1050, "Medical record not found", HttpStatus.BAD_REQUEST );
 
     private int code;
     private String message;
