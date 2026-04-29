@@ -3,6 +3,7 @@ package com.finalproject.vaccine_management.service;
 import com.finalproject.vaccine_management.dto.request.auth.AuthenticationRequest;
 import com.finalproject.vaccine_management.dto.request.auth.IntrospectRequest;
 import com.finalproject.vaccine_management.dto.request.auth.LogoutRequest;
+import com.finalproject.vaccine_management.dto.request.auth.RefreshRequest;
 import com.finalproject.vaccine_management.dto.response.AuthenticationResponse;
 import com.finalproject.vaccine_management.dto.response.IntrospectResponse;
 import com.nimbusds.jose.JOSEException;
@@ -14,4 +15,6 @@ public interface IAuthenticationService {
     public IntrospectResponse introspect (IntrospectRequest request) throws JOSEException, ParseException;
 
     void logout(LogoutRequest logoutRequest) throws ParseException, JOSEException;
+
+    AuthenticationResponse refreshToken(RefreshRequest request) throws ParseException, JOSEException;
 }

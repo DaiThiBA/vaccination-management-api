@@ -3,6 +3,7 @@ package com.finalproject.vaccine_management.service.Impl;
 import com.finalproject.vaccine_management.dto.request.auth.AuthenticationRequest;
 import com.finalproject.vaccine_management.dto.request.auth.IntrospectRequest;
 import com.finalproject.vaccine_management.dto.request.auth.LogoutRequest;
+import com.finalproject.vaccine_management.dto.request.auth.RefreshRequest;
 import com.finalproject.vaccine_management.dto.response.AuthenticationResponse;
 import com.finalproject.vaccine_management.dto.response.IntrospectResponse;
 import com.finalproject.vaccine_management.entity.InvalidatedToken;
@@ -46,10 +47,11 @@ public class AuthenticationService implements IAuthenticationService {
 
     InvalidateTokenRepository invalidateTokenRepository;
 
+    RefreshTokenCacheService refreshTokenCacheService;
+
     @Value("${jwt.signerKey}")
     @NonFinal
     protected String SIGNER_KEY;
-
 
 
     @Override
@@ -63,31 +65,45 @@ public class AuthenticationService implements IAuthenticationService {
             throw new AppException(ErrorCode.UNAUTHENTICATED);
         }
 
-        var token = generatedToken(user);
+        var accessToken = generatedToken(user,1, ChronoUnit.HOURS, "access");
+        var refreshToken = generatedToken(user, 7 ,ChronoUnit.DAYS, "refresh");
+
+        //Lưu refreshToken vào cache
+        try {
+            SignedJWT jwt = SignedJWT.parse(refreshToken);
+            String jti = jwt.getJWTClaimsSet().getJWTID();
+            refreshTokenCacheService.save(jti, user.getUsername());
+        } catch (Exception e) {
+            throw new RuntimeException(e);
+        }
 
         return AuthenticationResponse.builder()
                 .authenticated(authenticated)
-                .token(token)
+                .accessToken(accessToken)
+                .refreshToken(refreshToken)
                 .build();
-
     }
 
 
-
-    public String generatedToken(User user){
+    public String generatedToken(User user, long amount, ChronoUnit unit, String type){
 
         JWSHeader header = new JWSHeader(JWSAlgorithm.HS512);
 
-        JWTClaimsSet claimsSet = new JWTClaimsSet.Builder()
+        JWTClaimsSet.Builder builder = new JWTClaimsSet.Builder()
                 .subject(user.getUsername())
                 .issuer("daithi1026@gmail.com")
                 .issueTime(new Date())
                 .expirationTime(new Date(
-                        Instant.now().plus(1, ChronoUnit.HOURS).toEpochMilli()
+                        Instant.now().plus(amount, unit).toEpochMilli()
                 ))
                 .jwtID(UUID.randomUUID().toString())
-                .claim("scope", buildScope(user))
-                .build();
+                .claim("type", type);
+
+        if("access".equals(type)){
+            builder.claim("scope", buildScope(user));
+        }
+
+        JWTClaimsSet claimsSet = builder.build();
 
         Payload payload = new Payload(claimsSet.toJSONObject());
 
@@ -134,18 +150,61 @@ public class AuthenticationService implements IAuthenticationService {
 
     @Override
     public void logout(LogoutRequest logoutRequest) throws ParseException, JOSEException {
-        var signToken = verifyToken(logoutRequest.getToken());
+        var signedToken = verifyToken(logoutRequest.getToken());
 
-        String jit = signToken.getJWTClaimsSet().getJWTID();
-        Date expiryTime = signToken.getJWTClaimsSet().getExpirationTime();
+        String type = signedToken.getJWTClaimsSet()
+                .getStringClaim("type");
 
-        InvalidatedToken invalidatedToken = InvalidatedToken.builder()
-                .id(jit)
-                .expiryTime(expiryTime)
+        String jti = signedToken.getJWTClaimsSet().getJWTID();
+        
+        // Nếu là refresh token, remove khỏi cache
+        if ("refresh".equals(type)) {
+            refreshTokenCacheService.remove(jti);
+        }
+    }
+
+    @Override
+    public AuthenticationResponse refreshToken(RefreshRequest request) throws ParseException, JOSEException {
+        var signedToken = verifyToken(request.getToken());
+
+        String type = signedToken.getJWTClaimsSet().getStringClaim("type");
+
+        if(!"refresh".equals(type)){
+            throw new AppException(ErrorCode.UNAUTHENTICATED);
+        }
+
+        String oldJti = signedToken.getJWTClaimsSet().getJWTID();
+
+        //checkCache
+        String username = refreshTokenCacheService.get(oldJti);
+
+        if (username == null) {
+            throw new AppException(ErrorCode.UNAUTHENTICATED);
+        }
+
+        User user = userRepository.findByUsername(username)
+                .orElseThrow(() ->
+                        new AppException(ErrorCode.USER_NOT_FOUND));
+
+        refreshTokenCacheService.remove(oldJti);
+
+        String newAccessToken = generatedToken(user,1, ChronoUnit.HOURS, "access");
+
+        String newRefreshToken = generatedToken(user, 7 ,ChronoUnit.DAYS, "refresh");
+
+        try {
+            SignedJWT jwt = SignedJWT.parse(newRefreshToken);
+            String newJti = jwt.getJWTClaimsSet().getJWTID();
+            refreshTokenCacheService.save(newJti, user.getUsername());
+        } catch (Exception e) {
+            throw new RuntimeException(e);
+        }
+
+        return AuthenticationResponse.builder()
+                .authenticated(true)
+                .accessToken(newAccessToken)
+                .refreshToken(newRefreshToken)
                 .build();
-
-        invalidateTokenRepository.save(invalidatedToken);
-
     }
 
     private SignedJWT verifyToken(String token) throws JOSEException, ParseException {
@@ -159,7 +218,7 @@ public class AuthenticationService implements IAuthenticationService {
 
         var verified = signedJWT.verify(verifier);
 
-        if( (!verified) && expiryTime.after(new Date()))
+        if( (!verified) || expiryTime.before(new Date()))
             throw new AppException(ErrorCode.UNAUTHENTICATED);
         String tokenId = signedJWT.getJWTClaimsSet().getJWTID();
 
@@ -168,6 +227,5 @@ public class AuthenticationService implements IAuthenticationService {
         }
         return signedJWT;
     }
-
 
 }

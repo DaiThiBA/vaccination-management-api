@@ -20,6 +20,8 @@ spring:
         format_sql: true
 jwt:
   signerKey: "0b9f3768ad8da2bc950167c591c0cde6c1ac85506956c2771f6269d8a901c7ea"
+  access-token-validity: 20
+  refresh-token-validity: 120
 
 logging:
   level:

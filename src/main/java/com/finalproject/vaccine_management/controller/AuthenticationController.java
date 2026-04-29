@@ -3,6 +3,7 @@ package com.finalproject.vaccine_management.controller;
 import com.finalproject.vaccine_management.dto.request.auth.AuthenticationRequest;
 import com.finalproject.vaccine_management.dto.request.auth.IntrospectRequest;
 import com.finalproject.vaccine_management.dto.request.auth.LogoutRequest;
+import com.finalproject.vaccine_management.dto.request.auth.RefreshRequest;
 import com.finalproject.vaccine_management.dto.response.ApiResponse;
 import com.finalproject.vaccine_management.dto.response.AuthenticationResponse;
 import com.finalproject.vaccine_management.dto.response.IntrospectResponse;
@@ -48,6 +49,15 @@ public class AuthenticationController {
     public ApiResponse<Void> logout(@RequestBody LogoutRequest logoutRequest) throws ParseException, JOSEException {
         authenticationService.logout(logoutRequest);
         return ApiResponse.<Void>builder()
+                .build();
+    }
+
+    @PostMapping("/refresh")
+    public ApiResponse<AuthenticationResponse> refresh(
+            @RequestBody RefreshRequest request
+    ) throws ParseException, JOSEException {
+        return ApiResponse.<AuthenticationResponse>builder()
+                .result(authenticationService.refreshToken(request))
                 .build();
     }
 }

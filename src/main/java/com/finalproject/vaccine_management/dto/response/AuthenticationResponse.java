@@ -10,5 +10,6 @@ import org.springframework.web.bind.annotation.RequestMapping;
 @Builder
 public class AuthenticationResponse {
     private boolean authenticated;
-    private String token;
+    private String accessToken;
+    private String refreshToken;
 }
